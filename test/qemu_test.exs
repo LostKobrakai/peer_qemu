@@ -12,13 +12,10 @@ defmodule QemuTest do
         connection: :standard_io,
         wait_boot: 50000,
         exec: {peer_bridge, []},
-        args: ~w(-heart -env HEART_BEAT_TIMEOUT 30)c,
-        post_process_args: fn args ->
-          args =
-            args
-            |> Enum.join(" ")
-            |> String.replace(",", ",,")
-
+        post_process_args: fn _args ->
+          # Start qemu via peer_bridge
+          # TODO: Pass args to peer_bridge so they can be sent over the connection
+          #       with any other special arguments.
           [
             ~c"--raw-to-link",
             ~c"--",
@@ -43,9 +40,7 @@ defmodule QemuTest do
             ~c"if=none,file=qemu.img,format=raw,id=vdisk",
             ~c"-device",
             ~c"virtio-blk-device,drive=vdisk,bus=virtio-mmio-bus.0",
-            ~c"-nographic",
-            ~c"-fw_cfg",
-            ~c"name=opt/erl,string=#{args}"
+            ~c"-nographic"
           ]
         end
       })

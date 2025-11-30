@@ -37,15 +37,5 @@ fi
 # Build final command
 CMD=("$QEMU_BIN" "${QEMU_OPTS[@]}")
 
-# Add fw_cfg entry if we have erl args
-if [[ ${#ERL_ARGS[@]} -gt 0 ]]; then
-    # Use printf to properly join arguments with spaces
-    printf -v erl_string '%s ' "${ERL_ARGS[@]}"
-    erl_string="${erl_string% }"  # Remove trailing space
-    # Double any commas in the string for fw_cfg escaping
-    erl_string="${erl_string//,/,,}"
-    CMD+=("-fw_cfg" "name=opt/erl,string=$erl_string")
-fi
-
 # Execute QEMU with stdin/stdout connected
 exec "${CMD[@]}"
