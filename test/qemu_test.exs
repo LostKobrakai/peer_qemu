@@ -2,33 +2,24 @@ defmodule QemuTest do
   use ExUnit.Case
   doctest Qemu
 
-  test "greets the world" do
-    assert Qemu.hello() == :world
-  end
-
   test "talks to qemu nerves using peer" do
     Extrace.calls({:erlang, :open_port, :_}, 10)
 
-    qemu = :os.find_executable(:"qemu-system-aarch64")
+    peer_bridge = Application.app_dir(:peer_bridge, ["priv", "peer_bridge"]) |> to_charlist()
 
     {:ok, peer, _node} =
       :peer.start_link(%{
-        connection: 0,
+        connection: :standard_io,
         wait_boot: 50000,
-        exec: {qemu, []},
-        detached: false,
-        args: ~w(-heart -env HEART_BEAT_TIMEOUT 30)c,
-        post_process_args: fn args ->
-          args =
-            args
-            |> Enum.map(fn
-              [58, 58, 49 | _] -> ~c"10.0.2.2"
-              rest -> rest
-            end)
-            |> Enum.join(" ")
-            |> String.replace(",", ",,")
-
+        exec: {peer_bridge, []},
+        post_process_args: fn _args ->
+          # Start qemu via peer_bridge
+          # TODO: Pass args to peer_bridge so they can be sent over the connection
+          #       with any other special arguments.
           [
+            ~c"--raw-to-link",
+            ~c"--",
+            ~c"qemu-system-aarch64",
             ~c"-machine",
             ~c"virt,accel=hvf",
             ~c"-cpu",
@@ -38,7 +29,7 @@ defmodule QemuTest do
             ~c"-m",
             ~c"256M",
             ~c"-kernel",
-            ~c"/Users/benni/.nerves/artifacts/nerves_system_qemu_aarch64-portable-0.1.1/images/little_loader.elf",
+            ~c"#{System.user_home!()}/.nerves/artifacts/nerves_system_qemu_aarch64-portable-0.2.0/images/little_loader.elf",
             ~c"-netdev",
             ~c"user,id=eth0",
             ~c"-device",
@@ -46,19 +37,18 @@ defmodule QemuTest do
             ~c"-global",
             ~c"virtio-mmio.force-legacy=false",
             ~c"-drive",
-            ~c"if=none,file=virtual-disk.img,format=raw,id=vdisk",
+            ~c"if=none,file=qemu.img,format=raw,id=vdisk",
             ~c"-device",
             ~c"virtio-blk-device,drive=vdisk,bus=virtio-mmio-bus.0",
-            ~c"-nographic",
-            ~c"-fw_cfg",
-            ~c"name=opt/erl,string=#{args}"
+            ~c"-nographic"
           ]
         end
       })
 
-    {:ok, result} = :peer.call(peer, Nerves.Runtime.KV, :get_all, [])
+    results = :peer.call(peer, Nerves.Runtime.KV, :get_all, [])
 
-    IO.inspect(result)
+    assert is_map(results)
+    IO.inspect(results)
   rescue
     e ->
       Process.sleep(1000)
